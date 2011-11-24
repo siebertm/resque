@@ -158,8 +158,21 @@ module Resque
     args = queues.map { |q| "queue:#{q}" }
     args << timeout
 
-    queue, raw_payload = redis.blpop(*args)
-    queue ? [queue.split(":").last, decode(raw_payload)] : nil
+    begin
+      queue, raw_payload = nil, nil
+
+      if timeout > 0
+        SystemTimer.timeout_after(timeout + 5) do
+          queue, raw_payload = redis.blpop(*args)
+        end
+      else
+        queue, raw_payload = redis.blpop(*args)
+      end
+
+      queue ? [queue.split(":").last, decode(raw_payload)] : nil
+    rescue Timeout::Error
+      nil
+    end
   end
 
   # Returns an integer representing the size of a queue.
